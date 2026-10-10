@@ -31,7 +31,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         Configuration.getInstance().apply {
             load(this@MainActivity, getSharedPreferences("osm", MODE_PRIVATE))
-            userAgentValue = packageName
+            userAgentValue = "FakeRouteApp/1.0 (usage personnel)"
         }
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
