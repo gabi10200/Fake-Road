@@ -4,6 +4,10 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -22,6 +26,8 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 class MainActivity : Activity() {
 
@@ -30,6 +36,27 @@ class MainActivity : Activity() {
     private val points = mutableListOf<GeoPoint>()
     private val line = Polyline()
     private lateinit var attribution: TextView
+    private lateinit var me: MyLocationNewOverlay
+
+    /** Petite boule bleue à bord blanc qui marque la position courante. */
+    private fun dotBitmap(): Bitmap {
+        val density = resources.displayMetrics.density
+        val d = (24 * density).toInt()
+        val bmp = Bitmap.createBitmap(d, d, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = Color.WHITE
+        c.drawCircle(d / 2f, d / 2f, d / 2f, paint)
+        paint.color = Color.parseColor("#1E78FF")
+        c.drawCircle(d / 2f, d / 2f, d / 2f - 3f * density, paint)
+        return bmp
+    }
+
+    private fun enableDot() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            me.enableMyLocation()
+        }
+    }
 
     /** Fonds de carte sans clé API (le bouton « Changer de carte » les fait défiler). */
     private fun esri(name: String, path: String, ext: String): ITileSource =
@@ -70,6 +97,19 @@ class MainActivity : Activity() {
             override fun longPressHelper(p: GeoPoint): Boolean = false
         }))
         map.overlays.add(line)
+
+        // Boule de position : suit la position vue par le système (réelle, puis fictive pendant un trajet)
+        me = MyLocationNewOverlay(GpsMyLocationProvider(this), map).apply {
+            val dot = dotBitmap()
+            setPersonIcon(dot)
+            setPersonAnchor(0.5f, 0.5f)
+            setDirectionIcon(dot)
+            setDirectionAnchor(0.5f, 0.5f)
+            runOnFirstFix {
+                runOnUiThread { myLocation?.let { map.controller.animateTo(it) } }
+            }
+        }
+        map.overlays.add(me)
         root.addView(map, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
 
         val panel = LinearLayout(this).apply {
@@ -127,7 +167,14 @@ class MainActivity : Activity() {
                 attribution.text = sources[srcIdx].second
             }
         }
-        panel.addView(mapBtn)
+        val centerBtn = Button(this).apply {
+            text = "Me centrer"
+            setOnClickListener { me.myLocation?.let { map.controller.animateTo(it) } }
+        }
+        val row2 = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        row2.addView(centerBtn, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        row2.addView(mapBtn, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        panel.addView(row2)
         panel.addView(devBtn)
         attribution = TextView(this).apply {
             text = sources[0].second
@@ -179,6 +226,11 @@ class MainActivity : Activity() {
         startForegroundService(Intent(this, MockService::class.java))
     }
 
-    override fun onResume() { super.onResume(); map.onResume() }
-    override fun onPause() { map.onPause(); super.onPause() }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        enableDot()
+    }
+
+    override fun onResume() { super.onResume(); map.onResume(); enableDot() }
+    override fun onPause() { me.disableMyLocation(); map.onPause(); super.onPause() }
 }
