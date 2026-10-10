@@ -13,7 +13,10 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.*
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.tileprovider.tilesource.ITileSource
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
@@ -26,6 +29,26 @@ class MainActivity : Activity() {
     private lateinit var speedLabel: TextView
     private val points = mutableListOf<GeoPoint>()
     private val line = Polyline()
+    private lateinit var attribution: TextView
+
+    /** Fonds de carte sans clé API (le bouton « Changer de carte » les fait défiler). */
+    private fun esri(name: String, path: String, ext: String): ITileSource =
+        object : OnlineTileSourceBase(
+            name, 0, 19, 256, ext,
+            arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/$path/MapServer/tile/")
+        ) {
+            override fun getTileURLString(pMapTileIndex: Long): String =
+                baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" +
+                    MapTileIndex.getY(pMapTileIndex) + "/" + MapTileIndex.getX(pMapTileIndex)
+        }
+
+    private val sources: List<Pair<ITileSource, String>> by lazy {
+        listOf(
+            Pair(esri("EsriStreet", "World_Street_Map", ".png"), "© Esri, HERE, Garmin, OpenStreetMap contributors"),
+            Pair(esri("EsriSat", "World_Imagery", ".jpg"), "© Esri, Maxar, Earthstar Geographics"),
+            Pair(TileSourceFactory.OpenTopo as ITileSource, "© OpenTopoMap (CC-BY-SA), © OpenStreetMap contributors")
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,14 +60,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         map = MapView(this).apply {
-            setTileSource(XYTileSource(
-                "CartoVoyager", 0, 19, 256, ".png",
-                arrayOf(
-                    "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
-                    "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
-                    "https://c.basemaps.cartocdn.com/rastertiles/voyager/"
-                )
-            ))
+            setTileSource(sources[0].first)
             setMultiTouchControls(true)
             controller.setZoom(4.0)
             controller.setCenter(GeoPoint(46.6, 2.3))
@@ -102,11 +118,22 @@ class MainActivity : Activity() {
         panel.addView(seek)
         panel.addView(loopBox)
         panel.addView(row)
+        var srcIdx = 0
+        val mapBtn = Button(this).apply {
+            text = "Changer de carte"
+            setOnClickListener {
+                srcIdx = (srcIdx + 1) % sources.size
+                map.setTileSource(sources[srcIdx].first)
+                attribution.text = sources[srcIdx].second
+            }
+        }
+        panel.addView(mapBtn)
         panel.addView(devBtn)
-        panel.addView(TextView(this).apply {
-            text = "© OpenStreetMap contributors © CARTO"
+        attribution = TextView(this).apply {
+            text = sources[0].second
             textSize = 10f
-        })
+        }
+        panel.addView(attribution)
         root.addView(panel, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         setContentView(root)
 
