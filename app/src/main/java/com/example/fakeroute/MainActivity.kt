@@ -13,7 +13,7 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.*
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
@@ -37,7 +37,14 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         map = MapView(this).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(XYTileSource(
+                "CartoVoyager", 0, 19, 256, ".png",
+                arrayOf(
+                    "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+                    "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
+                    "https://c.basemaps.cartocdn.com/rastertiles/voyager/"
+                )
+            ))
             setMultiTouchControls(true)
             controller.setZoom(4.0)
             controller.setCenter(GeoPoint(46.6, 2.3))
@@ -96,6 +103,10 @@ class MainActivity : Activity() {
         panel.addView(loopBox)
         panel.addView(row)
         panel.addView(devBtn)
+        panel.addView(TextView(this).apply {
+            text = "© OpenStreetMap contributors © CARTO"
+            textSize = 10f
+        })
         root.addView(panel, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         setContentView(root)
 
