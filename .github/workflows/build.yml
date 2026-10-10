@@ -9,6 +9,18 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: 8.7 }
+      - name: Générer l'icône de l'appli
+        run: |
+          which convert || sudo apt-get install -y imagemagick
+          if [ ! -f icon.jpg ]; then
+            curl -fsSL -A "Mozilla/5.0" -o icon.jpg "https://images.expertmarket.co.uk/wp-content/uploads/sites/2/2019/10/AdobeStock_271214015-1.jpeg" \
+              || convert -size 512x512 xc:'#2a6df4' icon.jpg
+          fi
+          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            name=${d%%:*}; size=${d##*:}
+            mkdir -p app/src/main/res/mipmap-$name
+            convert icon.jpg -resize ${size}x${size}^ -gravity center -extent ${size}x${size} app/src/main/res/mipmap-$name/ic_launcher.png
+          done
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
